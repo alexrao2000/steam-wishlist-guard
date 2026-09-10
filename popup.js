@@ -13,10 +13,36 @@ function ago(ts) {
   return new Date(ts).toLocaleDateString();
 }
 
+// Steam changes things without warning. Rather than failing quietly, say so.
+function renderHealth(wishlistSource, hookMisses) {
+  const warnEl = document.getElementById('warn');
+  const notes = [];
+
+  if (wishlistSource === 'webapi') {
+    notes.push('<b>Reading the wishlist via the fallback API.</b> The usual '
+      + 'source stopped returning what we expect, which usually means Steam '
+      + 'changed something. Logging still works.');
+  }
+  if (hookMisses >= 2) {
+    notes.push(`<b>${hookMisses} removals were caught late.</b> They turned up in a `
+      + 'periodic check rather than at click time, while Steam was open here. '
+      + 'If you removed them in this browser, the confirmation prompt is '
+      + 'probably no longer firing.');
+  }
+
+  warnEl.hidden = notes.length === 0;
+  warnEl.innerHTML = notes.join('<br><br>');
+}
+
 async function render() {
-  const { log = [], snapshot, lastCheck, lastError } = await chrome.storage.local.get(
-    ['log', 'snapshot', 'lastCheck', 'lastError']
+  const {
+    log = [], snapshot, lastCheck, lastError,
+    wishlistSource, hookMisses = 0,
+  } = await chrome.storage.local.get(
+    ['log', 'snapshot', 'lastCheck', 'lastError', 'wishlistSource', 'hookMisses']
   );
+
+  renderHealth(wishlistSource, hookMisses);
 
   const size = Array.isArray(snapshot) ? `${snapshot.length} games watched` : 'no baseline yet';
   statusEl.textContent = lastCheck ? `${size} · checked ${ago(lastCheck)}` : size;

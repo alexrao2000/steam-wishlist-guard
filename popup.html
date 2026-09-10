@@ -29,6 +29,11 @@
   .empty { padding: 22px 14px; color: #8f98a0; text-align: center; }
   footer { padding: 10px 14px; border-top: 1px solid #2a475e; display: flex; justify-content: space-between; align-items: center; }
   .err { color: #e9917d; font-size: 11px; padding: 0 14px 10px; }
+  .warn {
+    margin: 0; padding: 10px 14px; font-size: 11px; line-height: 1.45;
+    background: #3a2a1c; color: #f0c98d; border-bottom: 1px solid #4a3722;
+  }
+  .warn b { color: #ffd79a; }
   .setting {
     display: flex; align-items: center; gap: 8px; cursor: pointer;
     padding: 10px 14px; border-bottom: 1px solid #21364a; color: #c7d5e0;
@@ -48,6 +53,7 @@
     <span class="hint">Shows a confirmation box on Steam's remove button</span>
   </span>
 </label>
+<div class="warn" id="warn" hidden></div>
 <ul id="list"></ul>
 <footer>
   <button id="check">Check now</button>

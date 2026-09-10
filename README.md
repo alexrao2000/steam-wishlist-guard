@@ -64,6 +64,48 @@ gated — `send()` is synchronous, so there's nowhere to await an answer without
 faking a response. Steam's store uses `fetch` for wishlist mutations, so this
 doesn't come up in practice.
 
+## Surviving Steam's changes
+
+Steam rewrites this stuff without warning, so nothing here assumes a particular
+endpoint name, payload format, or DOM.
+
+**Endpoint names are treated as hints, not contracts.** Instead of matching a
+fixed list, any URL containing `wishlist` that isn't a known read endpoint
+counts as a mutation. If it says remove, it's gated. If it says add, it isn't.
+If the name doesn't reveal the direction — a rename we've never seen — it isn't
+gated (blocking something that turned out to be an add would be worse) but it
+does trigger a diff, so the removal is still logged.
+
+**Payload formats are all tried.** appid is read from query params,
+form-encoded bodies, `input_json` blobs, and protobuf. That last one isn't
+hypothetical: Steam's notification API already returns protobuf, and the
+service API is heading the same way. Field 1 of the wishlist request messages
+is the appid, so a short varint walk recovers it. The query string is parsed
+directly rather than through `new URL()`, which throws on pages with an opaque
+origin and needs a base for relative URLs.
+
+**Transports are covered.** `fetch`, `XMLHttpRequest`, and `sendBeacon` are all
+wrapped.
+
+**Two independent ways to read the wishlist.** The store's userdata blob is the
+cheap one; the Web API (`IWishlistService/GetWishlist`, reached with a token
+from the points-summary config) is the fallback. They share no code path, so a
+change to either shape leaves the other working.
+
+**Failure is visible rather than silent.** This is the part that matters most —
+a guard that quietly stops guarding is worse than no guard. The popup warns
+when:
+
+- the wishlist is being read through the fallback API, which means the primary
+  source stopped returning what we expect;
+- removals keep being caught by the periodic check rather than at click time
+  while Steam was open in this browser, which means the interceptor probably
+  isn't firing any more.
+
+The second uses the diff as ground truth for the interceptor. One late catch is
+ambiguous — it could have been the phone app — so the warning waits for a
+pattern, and any click-time catch clears the counter.
+
 ## Restore
 
 The popup posts to `store.steampowered.com/api/addtowishlist` using the

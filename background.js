@@ -16,6 +16,8 @@
 
 const USERDATA = 'https://store.steampowered.com/dynamicstore/userdata/';
 const APPDETAILS = 'https://store.steampowered.com/api/appdetails';
+const ASYNC_CONFIG = 'https://store.steampowered.com/pointssummary/ajaxgetasyncconfig';
+const WEBAPI_WISHLIST = 'https://api.steampowered.com/IWishlistService/GetWishlist/v1/';
 const POLL_MINUTES = 60;
 const MAX_LOG = 500;
 
@@ -29,17 +31,55 @@ const set = (obj) => chrome.storage.local.set(obj);
 
 // --- wishlist fetch --------------------------------------------------------
 
-// Returns an array of appids, or throws if the answer can't be trusted.
-async function fetchWishlist() {
+// Two independent ways to read the wishlist. The store's userdata blob is the
+// cheap one; the Web API is the fallback, and it shares no code path with the
+// first, so a change to either shape leaves the other working. Whichever
+// answered is recorded, and the popup says so — running on the fallback is a
+// signal that Steam changed something.
+async function fetchViaUserdata() {
   const res = await fetch(USERDATA, { credentials: 'include', cache: 'no-store' });
-  if (!res.ok) throw new Error(`userdata returned HTTP ${res.status}`);
+  if (!res.ok) throw new Error(`userdata HTTP ${res.status}`);
   const data = await res.json();
   if (!Array.isArray(data.rgWishlist)) {
     // Signed out, or Steam changed the response shape. Either way, do not read
     // this as "the wishlist is empty" — that would log every game as removed.
-    throw new Error('no rgWishlist in response (signed out?)');
+    throw new Error('no rgWishlist array');
   }
   return data.rgWishlist.map(Number).filter(Number.isFinite);
+}
+
+async function fetchViaWebApi() {
+  const cfg = await fetch(ASYNC_CONFIG, { credentials: 'include', cache: 'no-store' });
+  const token = (await cfg.json())?.data?.webapi_token;
+  if (!token) throw new Error('no webapi token (signed out?)');
+  // The token is a JWT whose subject is the SteamID.
+  const claims = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+  const steamid = claims?.sub;
+  if (!steamid) throw new Error('no steamid in token');
+  const res = await fetch(
+    `${WEBAPI_WISHLIST}?access_token=${encodeURIComponent(token)}&steamid=${steamid}`,
+    { cache: 'no-store' }
+  );
+  const items = (await res.json())?.response?.items;
+  if (!Array.isArray(items)) throw new Error('no items array');
+  return items.map((i) => Number(i.appid)).filter(Number.isFinite);
+}
+
+// Returns an array of appids, or throws if neither source can be trusted.
+async function fetchWishlist() {
+  try {
+    const list = await fetchViaUserdata();
+    await set({ wishlistSource: 'userdata' });
+    return list;
+  } catch (primary) {
+    try {
+      const list = await fetchViaWebApi();
+      await set({ wishlistSource: 'webapi' });
+      return list;
+    } catch (fallback) {
+      throw new Error(`${primary.message}; fallback also failed: ${fallback.message}`);
+    }
+  }
 }
 
 // Names are cached indefinitely; they effectively never change, and appdetails
@@ -114,6 +154,16 @@ function notify(entries) {
 // --- path 1: interception --------------------------------------------------
 
 async function onIntercepted(action, appid) {
+  // Any signal at all means the hook is installed and matching something.
+  await set({ lastHookSignal: Date.now() });
+
+  if (action === 'mutation') {
+    // Wishlist changed but the endpoint name didn't say which way. Let the
+    // diff work out what actually happened.
+    setTimeout(() => snapshot('hook-unknown'), 1500);
+    return;
+  }
+
   if (!Number.isFinite(appid)) {
     // Saw the call but couldn't read the appid. Let the diff work it out.
     setTimeout(() => snapshot('hook-fallback'), 1500);
@@ -130,6 +180,8 @@ async function onIntercepted(action, appid) {
   }
 
   await appendRemovals([appid], 'click');
+  // The interceptor is demonstrably working; clear any accumulated suspicion.
+  await set({ hookMisses: 0, lastClickCatch: Date.now() });
 
   // Keep the baseline consistent with what we just logged, so the next diff
   // doesn't see this appid as newly missing.
@@ -174,6 +226,17 @@ async function snapshot(reason) {
   const now = new Set(current);
   const missing = previous.filter((a) => !now.has(a));
   const logged = missing.length ? await appendRemovals(missing, reason) : [];
+
+  // The diff is the ground truth, so it also doubles as a health check on the
+  // interceptor. A removal the diff found, when a Steam page was open in this
+  // browser recently, is a removal the hook should have caught first. One is
+  // ambiguous (it could have been the phone app); a pattern is not.
+  if (logged.length && reason === 'poll') {
+    const { lastPageActive = 0, hookMisses = 0 } = await get(['lastPageActive', 'hookMisses']);
+    if (Date.now() - lastPageActive < 6 * 60 * 60 * 1000) {
+      await set({ hookMisses: hookMisses + logged.length });
+    }
+  }
 
   await set({ snapshot: current });
   return { ok: true, removed: logged.length, size: current.length };
@@ -230,6 +293,9 @@ chrome.runtime.onMessage.addListener((msg, _sender, respond) => {
   switch (msg?.type) {
     case 'wishlist-mutated':
       onIntercepted(msg.action, Number(msg.appid));
+      return false;
+    case 'page-active':
+      set({ lastPageActive: Date.now() });
       return false;
     case 'resolve-name':
       resolveName(Number(msg.appid)).then((name) => respond({ name }));

@@ -1,6 +1,11 @@
 // Bridges the MAIN-world hook to the extension. MAIN-world scripts have no
 // access to chrome.runtime, so everything travels as window events.
 
+// Tell the worker a Steam page is open with the hook installed. It uses this
+// to tell "the phone app removed something" apart from "the interceptor
+// stopped working".
+chrome.runtime.sendMessage({ type: 'page-active' }).catch(() => {});
+
 // Push the confirm setting into the page, and keep it current if the user
 // toggles it in the popup while a Steam tab is open.
 function pushConfig(confirmEnabled) {

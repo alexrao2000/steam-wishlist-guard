@@ -1,26 +1,52 @@
 {
   "manifest_version": 3,
   "name": "Steam Wishlist Guard",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "Keeps a local log of games removed from your Steam wishlist, so an accidental removal can be undone.",
-  "permissions": ["storage", "alarms", "cookies", "notifications"],
-  "host_permissions": ["https://store.steampowered.com/*"],
-  "background": { "service_worker": "background.js" },
+  "permissions": [
+    "storage",
+    "alarms",
+    "cookies",
+    "notifications"
+  ],
+  "host_permissions": [
+    "https://store.steampowered.com/*",
+    "https://api.steampowered.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
   "action": {
     "default_popup": "popup.html",
-    "default_icon": { "16": "icons/icon16.png", "48": "icons/icon48.png", "128": "icons/icon128.png" }
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
   },
-  "icons": { "16": "icons/icon16.png", "48": "icons/icon48.png", "128": "icons/icon128.png" },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
   "content_scripts": [
     {
-      "matches": ["https://store.steampowered.com/*"],
-      "js": ["hook-main.js"],
+      "matches": [
+        "https://store.steampowered.com/*"
+      ],
+      "js": [
+        "hook-main.js"
+      ],
       "world": "MAIN",
       "run_at": "document_start"
     },
     {
-      "matches": ["https://store.steampowered.com/*"],
-      "js": ["hook-relay.js"],
+      "matches": [
+        "https://store.steampowered.com/*"
+      ],
+      "js": [
+        "hook-relay.js"
+      ],
       "world": "ISOLATED",
       "run_at": "document_start"
     }
