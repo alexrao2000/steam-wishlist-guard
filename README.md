@@ -43,6 +43,27 @@ Three guards keep it from crying wolf:
 - If the interceptor sees a wishlist call but can't parse an appid out of it, it
   falls back to triggering a diff rather than guessing.
 
+## Confirmation
+
+Removing a game pops a confirmation box first. Recovery is the fallback; not
+losing the game in the first place is the better outcome.
+
+The gate sits on the request, not on the remove button. Steam's wishlist is a
+React app with hashed class names, and the remove control appears in several
+places — wishlist rows, app pages, search capsules — so binding to the button
+would mean chasing selectors through every redesign. Wrapping `fetch` catches
+all of them at once: the hook holds the request, shows the modal, and either
+lets it through or drops it.
+
+Cancelling reloads the page. Steam updates its UI optimistically, so by the time
+the modal appears the row may already look removed; a reload is the reliable way
+to get the page back in sync with a server that never heard about it.
+
+Turn it off with the checkbox in the popup. XHR-based calls are logged but not
+gated — `send()` is synchronous, so there's nowhere to await an answer without
+faking a response. Steam's store uses `fetch` for wishlist mutations, so this
+doesn't come up in practice.
+
 ## Restore
 
 The popup posts to `store.steampowered.com/api/addtowishlist` using the

@@ -84,6 +84,15 @@ async function render() {
   }
 }
 
+const toggle = document.getElementById('confirmToggle');
+chrome.storage.local.get('confirmEnabled').then(({ confirmEnabled }) => {
+  // Unset means never configured, and confirming is the default.
+  toggle.checked = confirmEnabled !== false;
+});
+toggle.addEventListener('change', () => {
+  chrome.storage.local.set({ confirmEnabled: toggle.checked });
+});
+
 document.getElementById('check').addEventListener('click', async (ev) => {
   ev.target.disabled = true;
   await chrome.runtime.sendMessage({ type: 'snapshot-now' });

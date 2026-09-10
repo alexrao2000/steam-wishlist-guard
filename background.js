@@ -231,6 +231,9 @@ chrome.runtime.onMessage.addListener((msg, _sender, respond) => {
     case 'wishlist-mutated':
       onIntercepted(msg.action, Number(msg.appid));
       return false;
+    case 'resolve-name':
+      resolveName(Number(msg.appid)).then((name) => respond({ name }));
+      return true;
     case 'snapshot-now':
       snapshot('manual').then(respond);
       return true;

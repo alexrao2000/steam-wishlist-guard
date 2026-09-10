@@ -29,12 +29,25 @@
   .empty { padding: 22px 14px; color: #8f98a0; text-align: center; }
   footer { padding: 10px 14px; border-top: 1px solid #2a475e; display: flex; justify-content: space-between; align-items: center; }
   .err { color: #e9917d; font-size: 11px; padding: 0 14px 10px; }
+  .setting {
+    display: flex; align-items: center; gap: 8px; cursor: pointer;
+    padding: 10px 14px; border-bottom: 1px solid #21364a; color: #c7d5e0;
+  }
+  .setting:hover { background: #1f2f42; }
+  .setting input { accent-color: #66c0f4; margin: 0; }
+  .setting .hint { display: block; font-size: 11px; color: #8f98a0; }
 </style>
 <header>
   <h1>Wishlist Guard</h1>
   <span id="status">…</span>
 </header>
 <div class="err" id="err" hidden></div>
+<label class="setting">
+  <input type="checkbox" id="confirmToggle">
+  <span>Ask before removing
+    <span class="hint">Shows a confirmation box on Steam's remove button</span>
+  </span>
+</label>
 <ul id="list"></ul>
 <footer>
   <button id="check">Check now</button>
