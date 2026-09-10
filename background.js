@@ -279,12 +279,24 @@ async function restore(appid) {
 
 // --- wiring ---------------------------------------------------------------
 
-function schedule() {
+// Reloading an extension clears its alarms, and onInstalled does not reliably
+// fire on a manual reload of an unpacked extension. So the alarm is ensured on
+// every service worker start rather than only at install time — otherwise
+// polling can end up silently dead until the next browser restart.
+//
+// It is only (re)created when missing or when the period has changed. MV3
+// restarts this worker constantly, and calling alarms.create unconditionally
+// would reset the countdown each time, so the alarm would never fire.
+async function ensureAlarm() {
+  const existing = await chrome.alarms.get('poll');
+  if (existing && existing.periodInMinutes === POLL_MINUTES) return;
   chrome.alarms.create('poll', { periodInMinutes: POLL_MINUTES, delayInMinutes: 0.1 });
 }
 
-chrome.runtime.onInstalled.addListener(() => { schedule(); snapshot('installed'); });
-chrome.runtime.onStartup.addListener(() => { schedule(); snapshot('startup'); });
+ensureAlarm();
+
+chrome.runtime.onInstalled.addListener(() => { ensureAlarm(); snapshot('installed'); });
+chrome.runtime.onStartup.addListener(() => { ensureAlarm(); snapshot('startup'); });
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === 'poll') snapshot('poll');
 });

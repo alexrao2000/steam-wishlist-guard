@@ -113,13 +113,22 @@ The popup posts to `store.steampowered.com/api/addtowishlist` using the
 is a stale session — the game's name in the popup links to its store page, where
 the normal wishlist button always works.
 
+## Developing
+
+Nothing is packed — the loaded extension reads straight from this directory —
+but Chrome doesn't watch it either. After an edit, hit reload on
+`chrome://extensions`. Changes to `hook-main.js` or `hook-relay.js` also need
+any open Steam tab reloaded, since content scripts are injected at page load
+and an open tab keeps running the old copy.
+
 ## Notes
 
 Everything stays in `chrome.storage.local`; nothing is sent anywhere. The log
 keeps the 500 most recent removals.
 
 Poll interval is `POLL_MINUTES` at the top of `background.js`, currently 60.
-It only governs the backstop — clicks in this browser are caught immediately —
+Changing it takes effect on the next worker start; the alarm is re-created
+whenever the stored period no longer matches. It only governs the backstop — clicks in this browser are caught immediately —
 so there is little reason to lower it. Chrome may stretch alarm intervals when
 the browser is idle, and for a removal caught by the diff rather than the hook,
 the logged timestamp is when it was noticed, not when it happened.
